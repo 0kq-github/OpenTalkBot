@@ -4,9 +4,9 @@
 BOT_TOKEN = ""
 
 #VOICEVOX生成サーバー
-VOCIEVOX_SERVER = "localhost"
+VOCIEVOX_SERVER = "http://localhost:50021/"
 
 #VOICERODI生成サーバー
-VOICERODI_SERVER = "localhost"
+VOICERODI_SERVER = "http://localhost:8100"
 
 
