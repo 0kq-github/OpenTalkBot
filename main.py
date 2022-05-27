@@ -17,6 +17,7 @@ from threading import Thread
 import logging
 import csv
 from typing import List
+import re
 
 class CustomFormatter(logging.Formatter):
 
@@ -158,6 +159,43 @@ def rep_dict(text):
 
 #音声生成
 def generate(datime,message:discord.Message,speak_conf:dict):
+  #伏せ字
+  spoiler = re.findall("\|\|.*\|\|",message.content)
+  if spoiler:
+    for i in spoiler:
+      message.content = message.content.replace(i,"伏せ字")
+  
+  #メンション(メンバー)
+  mention_member = re.findall("<@[!]?\d{18}>", message.content)
+  for m in mention_member:
+    m = m.replace("<","").replace(">","").replace("@","").replace("!","")
+    for i in message.mentions:
+      if not str(i.id) == m:
+        continue
+      mentioned_name = i.display_name
+      message.content = message.content.replace(f"<@{m}>","@"+mentioned_name)
+      message.content = message.content.replace(f"<@!{m}>","@"+mentioned_name)
+  
+  #メンション(チャンネル)
+  mention_channel = re.findall("<#\d{18}>", message.content)
+  for m in mention_channel:
+    m = m.replace("<","").replace(">","").replace("#","").replace("!","")
+    for i in message.channel_mentions:
+      if not str(i.id) == m:
+        continue
+      mentioned_channel = i.name
+      message.content = message.content.replace(f"<#{m}>", mentioned_channel)
+  
+  #絵文字
+  emoji = re.findall("<.?:[^<^>]*:\d{18}>", message.content)
+  if emoji:
+    for i in emoji:
+      emoji = re.search(":[^:]*:", i).group()
+      message.content = message.content.replace(i,emoji)
+
+  #URL
+  message.content = re.sub("(https?):\/\/[^(\s　)]+","URL省略",message.content)
+
   name = rep_dict(message.author.display_name)
   text = rep_dict(message.content)
   logger.info(f"{message.author.display_name}: {message.content} >> {name}: {text}")
