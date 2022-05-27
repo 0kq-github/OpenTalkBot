@@ -110,7 +110,6 @@ async def send_audio():
     elif not os.path.exists(path):
       return
     else:
-      logger.debug(f"playing {path}")
       queue.pop(0)
       wav_source = discord.FFmpegPCMAudio(path, before_options="-guess_layout_max 0", options=f"-af equalizer=f=200:t=h:w=200")
       wav_source_half = discord.PCMVolumeTransformer(wav_source, volume=0.5)
@@ -143,6 +142,7 @@ def generate(datime,message:discord.Message,speak_conf:dict):
   if speak_conf["speaker"] in vc_list:
     vc.generate(f"{name} {text}",path+"_temp",speak_conf["speaker"],speak_conf["style"],speak_conf["speed"],speak_conf["ptich"])
   os.rename(path+"_temp",path)
+  
 
 async def trigger(message:discord.Message):
   async with aiofiles.open("./user.json",mode="r",encoding="utf-8") as f:
