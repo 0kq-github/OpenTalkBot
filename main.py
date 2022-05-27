@@ -110,6 +110,7 @@ async def send_audio():
     elif not os.path.exists(path):
       return
     else:
+      logger.debug(f"playing {path}")
       queue.pop(0)
       wav_source = discord.FFmpegPCMAudio(path, before_options="-guess_layout_max 0", options=f"-af equalizer=f=200:t=h:w=200")
       wav_source_half = discord.PCMVolumeTransformer(wav_source, volume=0.5)
@@ -202,6 +203,7 @@ class talk(app_commands.Group):
     try:
       await itr.guild.voice_client.disconnect()
       embed = discord.Embed(title="切断しました。",color=discord.Colour.green())
+      queue.clear()
     except Exception as e:
       embed = discord.Embed(title=f"エラーが発生しました {e}",color=discord.Colour.red())
     finally:
