@@ -43,11 +43,10 @@ def generate(text:str,speaker:str,mode:str,speed:float,pitch:float):
 def speakers():
     with pyvcroid2.VcRoid2() as vc:
       resp = {
-        "speakers":vc.listSpeakers(),
-        "languages":vc.listLanguages(),
-        "voices":vc.listVoices()
+        "speakers":vc.listVoices(),
+        "languages":vc.listLanguages()
         }
-      return JSONResponse(json.dumps(resp)) 
+      return resp
 
 def run(port:int, logger = None):
   try:

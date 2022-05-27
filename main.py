@@ -82,7 +82,7 @@ def get_speakers():
           speakers[i["name"]][f"{i['name']}_{s['name']}"] = s["id"]
       logger.info("VOICEVOXが読み込まれました")
       logger.info(" ".join(vv_list))
-    except requests.ConnectionError:
+    except Exception:
       logger.warning("VOICEVOXサーバーへの接続に失敗しました")
 
   with requests.Session() as session:
@@ -95,8 +95,8 @@ def get_speakers():
       for i in resp_dict["speakers"]:
         speakers[i] = langs
         vc_list.append(i)
-    except Exception:
-      logger.warning("VOICEROIDサーバーへの接続に失敗しました")
+    except Exception as e:
+      logger.warning(f"VOICEROIDサーバーへの接続に失敗しました {e}")
     
   for s in speakers.values():
     for i in s.keys():
@@ -131,7 +131,6 @@ async def on_ready():
     logger.warning("話者が見つかりませんでした。VOICEVOXまたはVOICEROIDの設定は適切ですか？")
   logger.info("BOTが起動しました!")
   logger.info(f"{client.user.name} v{version}")
-  print(style_list)
 
 def dict_reader(path):
   with open(path,mode="r",encoding="utf-16",newline="") as f:
@@ -163,7 +162,7 @@ def generate(datime,message:discord.Message,speak_conf:dict):
   if speak_conf["speaker"] in vv_list:
     vv.generate(f"{name} {text}",path+"_temp",speak_conf["style"],speak_conf["speed"],speak_conf["pitch"])
   if speak_conf["speaker"] in vc_list:
-    vc.generate(f"{name} {text}",path+"_temp",speak_conf["speaker"],speak_conf["style"],speak_conf["speed"],speak_conf["ptich"])
+    vc.generate(f"{name} {text}",path+"_temp",speak_conf["speaker"],speak_conf["style"],speak_conf["speed"],speak_conf["pitch"])
   os.rename(path+"_temp",path)
   
 
@@ -303,11 +302,16 @@ class talk(app_commands.Group):
   @app_commands.command(name="set")
   @app_commands.describe(話者=v_suggest,スタイル=v_suggest,速度=v_suggest,ピッチ=v_suggest)
   @app_commands.autocomplete(話者=actor_autocomplete,スタイル=style_autocomplete)
-  async def setvoice(self, itr:discord.Interaction, 話者:str, スタイル:str, 速度:float = 1.0, ピッチ:float = 0.0):
+  async def setvoice(self, itr:discord.Interaction, 話者:str, スタイル:str, 速度:float = 1.0, ピッチ:float = 100.0):
     speaker = 話者
     style = スタイル
     speed = 速度
     pitch = ピッチ
+
+    if speaker in vv_list:
+      pitch = 0.0
+    if speaker in vc_list:
+      pitch = 1.0
 
     async with aiofiles.open("./user.json",mode="r",encoding="utf-8") as f:
       data = await f.read()
@@ -340,7 +344,7 @@ tree.add_command(talk())
 async def start_bot():
   setup()
   
-  th = Thread(target=voiceroid_server.run,args=(50021,logger,))
+  th = Thread(target=voiceroid_server.run,args=(8100,logger,))
   th.setDaemon(True)
   th.start()
 
