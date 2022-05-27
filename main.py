@@ -57,6 +57,7 @@ speakers:dict = {}
 queue:list =[]
 vv_list = []
 vc_list = []
+style_list = []
 vv = voicevox.voicevox(config.VOICEVOX_SERVER)
 vc = voiceroid.voiceroid(config.VOICEROID_SERVER)
 
@@ -78,7 +79,7 @@ def get_speakers():
         speakers[i["name"]] = {}
         vv_list.append(i["name"])
         for s in i["styles"]:
-          speakers[i["name"]][f"VOICEVOX_{s['name']}"] = s["id"]
+          speakers[i["name"]][f"{i['name']}_{s['name']}"] = s["id"]
       logger.info("VOICEVOXが読み込まれました")
       logger.info(" ".join(vv_list))
     except requests.ConnectionError:
@@ -96,7 +97,11 @@ def get_speakers():
         vc_list.append(i)
     except Exception:
       logger.warning("VOICEROIDサーバーへの接続に失敗しました")
-      
+    
+  for s in speakers.values():
+    for i in s.keys():
+      style_list.append(i)
+
 
 #音声再生ループ
 @tasks.loop(seconds=0.01)
@@ -126,6 +131,7 @@ async def on_ready():
     logger.warning("話者が見つかりませんでした。VOICEVOXまたはVOICEROIDの設定は適切ですか？")
   logger.info("BOTが起動しました!")
   logger.info(f"{client.user.name} v{version}")
+  print(style_list)
 
 def dict_reader(path):
   with open(path,mode="r",encoding="utf-16",newline="") as f:
@@ -216,9 +222,10 @@ class talk(app_commands.Group):
         description=f"<#{itr.channel.id}>\n\n:arrow_down:\n\n<#{itr.user.voice.channel.id}>",
         color=discord.Colour.green()
         )
-    except:
+    except Exception as e:
       embed = discord.Embed(
         title="接続に失敗しました",
+        description=f"{e}",
         color=discord.Colour.red()
         )
     finally:
@@ -235,7 +242,8 @@ class talk(app_commands.Group):
       queue.clear()
     except Exception as e:
       embed = discord.Embed(
-        title=f"エラーが発生しました {e}",
+        title=f"エラーが発生しました",
+        description=f"{e}",
         color=discord.Colour.red()
         )
     finally:
@@ -283,26 +291,43 @@ class talk(app_commands.Group):
     itr: discord.Interaction,
     current: str,
   ) -> List[app_commands.Choice[str]]:
-      return [app_commands.Choice(name=a, value=a) for a in vv_list+vc_list]
+    return [app_commands.Choice(name=a, value=a) for a in vv_list+vc_list]
 
   async def style_autocomplete(self,
     itr: discord.Interaction,
     current: str,
   ) -> List[app_commands.Choice[str]]:
-      return [app_commands.Choice(name=a, value=a) for a in ["ノーマル"]]
+    return [app_commands.Choice(name=a, value=a) for a in style_list]
     
   v_suggest = "/talk set ずんだもん VOICEVOX_ノーマル"
   @app_commands.command(name="set")
   @app_commands.describe(話者=v_suggest,スタイル=v_suggest,速度=v_suggest,ピッチ=v_suggest)
   @app_commands.autocomplete(話者=actor_autocomplete,スタイル=style_autocomplete)
   async def setvoice(self, itr:discord.Interaction, 話者:str, スタイル:str, 速度:float = 1.0, ピッチ:float = 0.0):
-    ...
+    speaker = 話者
+    style = スタイル
+    speed = 速度
+    pitch = ピッチ
+
+    async with aiofiles.open("./user.json",mode="r",encoding="utf-8") as f:
+      data = await f.read()
+      user_conf = json.loads(data)
+      user_conf[str(itr.user.id)] = {
+        "speaker":speaker,
+        "style":speakers[speaker][style],
+        "speed":speed,
+        "pitch":pitch
+      }
+
+    async with aiofiles.open("./user.json",mode="w",encoding="utf-8") as f:
+      await f.write(json.dumps(user_conf))
+    
+    embed = discord.Embed(title="話者設定",description=f"**{speaker}**\n{style}",color=discord.Colour.blue())
+    embed.add_field(name="速度",value=f"{speed}")
+    embed.add_field(name="ピッチ",value=f"{pitch}")
+    await itr.response.send_message(embed=embed)
 
 tree.add_command(talk())
-
-
-
-
 
 
 
