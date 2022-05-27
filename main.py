@@ -15,7 +15,8 @@ import asyncio
 import requests
 from threading import Thread
 import logging
-
+import csv
+from typing import List
 
 class CustomFormatter(logging.Formatter):
 
@@ -114,7 +115,6 @@ async def send_audio():
       wav_source = discord.FFmpegPCMAudio(path, before_options="-guess_layout_max 0", options=f"-af equalizer=f=200:t=h:w=200")
       wav_source_half = discord.PCMVolumeTransformer(wav_source, volume=0.5)
       message.guild.voice_client.play(wav_source_half)
-      os.remove(path)
       
 
 
@@ -127,8 +127,24 @@ async def on_ready():
   logger.info("BOTが起動しました!")
   logger.info(f"{client.user.name} v{version}")
 
+def dict_reader(path):
+  with open(path,mode="r",encoding="utf-16",newline="") as f:
+    u_dict = csv.reader(f)
+    u_dict = {row[0]:row[1] for row in u_dict}
+    return u_dict
+
+def dict_writer(path, u_dict):
+  with open(path,mode="w",encoding="utf-16",newline="") as f:
+    writer = csv.writer(f)
+    for k, v in u_dict.items():
+      writer.writerow([k,v])
+
+
 #辞書置換
 def rep_dict(text):
+  u_dict = dict_reader("./dict.csv")
+  for i in u_dict:
+    text = text.replace(i,u_dict[i])
   return text
 
 
@@ -136,6 +152,7 @@ def rep_dict(text):
 def generate(datime,message:discord.Message,speak_conf:dict):
   name = rep_dict(message.author.display_name)
   text = rep_dict(message.content)
+  logger.info(f"{message.author.display_name}: {message.content} >> {name}: {text}")
   path = f"./temp/{datime}.wav"
   if speak_conf["speaker"] in vv_list:
     vv.generate(f"{name} {text}",path+"_temp",speak_conf["style"],speak_conf["speed"],speak_conf["pitch"])
@@ -178,23 +195,32 @@ async def on_message(message: discord.Message):
     return
   if client.voice_clients:
     await trigger(message)
-    logger.info(f"{message.author.display_name} >> {message.content}")
 
 
 class talk(app_commands.Group):
 
   @app_commands.command(name="help")
   async def help(self, itr:discord.Interaction):
-    embed = discord.Embed(title="OpenTalkBotについて",description="")
+    embed = discord.Embed(
+      title="OpenTalkBotについて",
+      description=""
+      )
     await itr.response.send_message(embed=embed)
 
   @app_commands.command(name="start")
   async def start(self, itr:discord.Interaction):
     try: 
       await itr.user.voice.channel.connect()
-      embed = discord.Embed(title="接続しました！",description=f"<#{itr.channel.id}>\n\n:arrow_down:\n\n<#{itr.user.voice.channel.id}>",color=discord.Colour.green())
+      embed = discord.Embed(
+        title="接続しました！",
+        description=f"<#{itr.channel.id}>\n\n:arrow_down:\n\n<#{itr.user.voice.channel.id}>",
+        color=discord.Colour.green()
+        )
     except:
-      embed = discord.Embed(title="接続に失敗しました",color=discord.Colour.red())
+      embed = discord.Embed(
+        title="接続に失敗しました",
+        color=discord.Colour.red()
+        )
     finally:
       await itr.response.send_message(embed=embed)
   
@@ -202,12 +228,75 @@ class talk(app_commands.Group):
   async def end(self, itr:discord.Interaction):
     try:
       await itr.guild.voice_client.disconnect()
-      embed = discord.Embed(title="切断しました。",color=discord.Colour.green())
+      embed = discord.Embed(
+        title="切断しました。",
+        color=discord.Colour.green()
+        )
       queue.clear()
     except Exception as e:
-      embed = discord.Embed(title=f"エラーが発生しました {e}",color=discord.Colour.red())
+      embed = discord.Embed(
+        title=f"エラーが発生しました {e}",
+        color=discord.Colour.red()
+        )
     finally:
       await itr.response.send_message(embed=embed)
+
+
+  @app_commands.command(name="add")
+  async def add(self, itr:discord.Interaction, 単語:str, 意味:str):
+    word = 単語
+    mean = 意味
+    u_dict = dict_reader("./dict.csv")
+    u_dict[word] = mean
+    dict_writer("./dict.csv",u_dict)
+    embed = discord.Embed(
+      title="ユーザー辞書",
+      description=f"**{word}** : **{mean}**",
+      color=discord.Colour.green()
+      )
+    await itr.response.send_message(embed=embed)
+
+
+  @app_commands.command(name="del")
+  async def delete(self, itr:discord.Interaction, 単語:str):
+    word = 単語
+    u_dict = dict_reader("./dict.csv")
+    try:
+      u_dict.pop(word)
+      dict_writer("./dict.csv",u_dict)
+      embed = discord.Embed(
+        title="ユーザー辞書",
+        description=f"削除 **{word}**",
+        color=discord.Colour.blue()
+        )
+    except:
+      embed = discord.Embed(
+        title="ユーザー辞書",
+        description=f"辞書が見つかりませんでした",
+        color=discord.Colour.blue()
+      )
+    finally:
+      await itr.response.send_message(embed=embed)
+    
+  
+  async def actor_autocomplete(self,
+    itr: discord.Interaction,
+    current: str,
+  ) -> List[app_commands.Choice[str]]:
+      return [app_commands.Choice(name=a, value=a) for a in vv_list+vc_list]
+
+  async def style_autocomplete(self,
+    itr: discord.Interaction,
+    current: str,
+  ) -> List[app_commands.Choice[str]]:
+      return [app_commands.Choice(name=a, value=a) for a in ["ノーマル"]]
+    
+  v_suggest = "/talk set ずんだもん VOICEVOX_ノーマル"
+  @app_commands.command(name="set")
+  @app_commands.describe(話者=v_suggest,スタイル=v_suggest,速度=v_suggest,ピッチ=v_suggest)
+  @app_commands.autocomplete(話者=actor_autocomplete,スタイル=style_autocomplete)
+  async def setvoice(self, itr:discord.Interaction, 話者:str, スタイル:str, 速度:float = 1.0, ピッチ:float = 0.0):
+    ...
 
 tree.add_command(talk())
 
