@@ -95,12 +95,15 @@ def get_speakers():
       for i in resp_dict["speakers"]:
         speakers[i] = langs
         vc_list.append(i)
-    except Exception as e:
-      logger.warning(f"VOICEROIDサーバーへの接続に失敗しました {e}")
+      logger.info("VOICEROIDが読み込まれました")
+      logger.info(" ".join(vc_list))
+    except Exception:
+      logger.warning(f"VOICEROIDサーバーへの接続に失敗しました")
     
   for s in speakers.values():
     for i in s.keys():
-      style_list.append(i)
+      if not i in style_list:
+        style_list.append(i)
 
 
 #音声再生ループ
@@ -203,16 +206,29 @@ async def on_message(message: discord.Message):
 
 
 class talk(app_commands.Group):
+  help_msg = [
+    "VCへ接続",
+    "VCから切断",
+    "辞書の追加",
+    "辞書の削除",
+    "話者の設定"
+  ]
 
-  @app_commands.command(name="help")
+  @app_commands.command(name="help",description="help")
   async def help(self, itr:discord.Interaction):
     embed = discord.Embed(
       title="OpenTalkBotについて",
-      description=""
+      description=f"**Version {version}**\n[リポジトリ](https://github.com/0kq-github/OpenTalkBot)",
+      color=discord.Colour.blue()
       )
+    embed.add_field(name="/talk start",value=self.help_msg[0])
+    embed.add_field(name="/talk end",value=self.help_msg[1])
+    embed.add_field(name="/talk add",value=self.help_msg[2])
+    embed.add_field(name="/talk del",value=self.help_msg[3])
+    embed.add_field(name="/talk set",value=self.help_msg[4])
     await itr.response.send_message(embed=embed)
 
-  @app_commands.command(name="start")
+  @app_commands.command(name="start",description=help_msg[0])
   async def start(self, itr:discord.Interaction):
     try: 
       await itr.user.voice.channel.connect()
@@ -230,7 +246,7 @@ class talk(app_commands.Group):
     finally:
       await itr.response.send_message(embed=embed)
   
-  @app_commands.command(name="end")
+  @app_commands.command(name="end",description=help_msg[1])
   async def end(self, itr:discord.Interaction):
     try:
       await itr.guild.voice_client.disconnect()
@@ -249,7 +265,7 @@ class talk(app_commands.Group):
       await itr.response.send_message(embed=embed)
 
 
-  @app_commands.command(name="add")
+  @app_commands.command(name="add",description=help_msg[2])
   async def add(self, itr:discord.Interaction, 単語:str, 意味:str):
     word = 単語
     mean = 意味
@@ -264,7 +280,7 @@ class talk(app_commands.Group):
     await itr.response.send_message(embed=embed)
 
 
-  @app_commands.command(name="del")
+  @app_commands.command(name="del",description=help_msg[3])
   async def delete(self, itr:discord.Interaction, 単語:str):
     word = 単語
     u_dict = dict_reader("./dict.csv")
@@ -299,7 +315,7 @@ class talk(app_commands.Group):
     return [app_commands.Choice(name=a, value=a) for a in style_list]
     
   v_suggest = "/talk set ずんだもん VOICEVOX_ノーマル"
-  @app_commands.command(name="set")
+  @app_commands.command(name="set",description=help_msg[4])
   @app_commands.describe(話者=v_suggest,スタイル=v_suggest,速度=v_suggest,ピッチ=v_suggest)
   @app_commands.autocomplete(話者=actor_autocomplete,スタイル=style_autocomplete)
   async def setvoice(self, itr:discord.Interaction, 話者:str, スタイル:str, 速度:float = 1.0, ピッチ:float = 100.0):
