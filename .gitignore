@@ -2,6 +2,11 @@ config.py
 temp
 dict.csv
 user.json
+hts_voice
+download
+jtalk_dict
+softalk
+open_jtalk.exe
 
 
 # Byte-compiled / optimized / DLL files
@@ -133,3 +138,4 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+config.py

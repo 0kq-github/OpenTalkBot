@@ -3,6 +3,8 @@ from bot_modules import *
 from bot_modules import voiceroid_server
 from bot_modules import voiceroid
 from bot_modules import voicevox
+from bot_modules import jtalk
+from bot_modules import softalk
 
 import discord
 from discord import app_commands
@@ -18,6 +20,11 @@ import logging
 import csv
 from typing import List
 import re
+import tarfile
+import tqdm
+import shutil
+import xml.etree.ElementTree as ET
+import subprocess
 
 class CustomFormatter(logging.Formatter):
 
@@ -53,14 +60,21 @@ intents = discord.Intents.all()
 client = discord.Client(intents=intents)
 tree = app_commands.CommandTree(client)
 
+dict_url = "https://altushost-swe.dl.sourceforge.net/project/open-jtalk/Dictionary/open_jtalk_dic-1.11/open_jtalk_dic_shift_jis-1.11.tar.gz"
+mmdagent_url = "http://jaist.dl.sourceforge.net/project/mmdagent/MMDAgent_Example/MMDAgent_Example-1.8/MMDAgent_Example-1.8.zip"
+
 global speakers
 speakers:dict = {}
 queue:list =[]
-vv_list = []
-vc_list = []
+vv_list = [] #voicevox話者一覧
+vc_list = [] #voiceroid話者一覧
+jt_list = [] #openjtalk話者一覧
+st_list = [] #softalk話者一覧
 style_list = []
 vv = voicevox.voicevox(config.VOICEVOX_SERVER)
 vc = voiceroid.voiceroid(config.VOICEROID_SERVER)
+jt = jtalk.jtalk(config.OPENJTALK_PATH)
+st = softalk.softalk(config.SOFTALK_PATH)
 
 #必要ファイル、ディレクトリの作成
 def setup():
@@ -69,9 +83,68 @@ def setup():
     open("./dict.csv",encoding="utf-16",mode="w").write("")
   if not os.path.exists("./user.json"):
     open("./user.json",encoding="utf-8",mode="w").write("{}")
+  if os.path.exists("./open_jtalk.exe"):
+    if not os.path.exists("./jtalk_dict/"):
+      logger.info("OpenJtalkの辞書をダウンロード中...")
+      file_size = int(requests.head(dict_url).headers["content-length"])
+      session = requests.get(dict_url, stream=True)
+      pbar = tqdm.tqdm(total=file_size, unit="B", unit_scale=True)
+      with open("./download/dict.tar.gz",mode="wb") as f:
+        for chunk in session.iter_content(chunk_size=1024):
+          f.write(chunk)
+          pbar.update(len(chunk))
+        #f.write(session.content)
+      t = tarfile.open(name="./download/dict.tar.gz")
+      t.extractall("./jtalk_dict/")
+    if not os.path.exists(config.HTS_DIR):
+      logger.info("htsvoiceをダウンロード中...")
+      file_size = int(requests.head(mmdagent_url).headers["content-length"])
+      session = requests.get(mmdagent_url, stream=True)
+      pbar = tqdm.tqdm(total=file_size, unit="B", unit_scale=True)
+      with open("./download/mmdagent.zip",mode="wb") as f:
+        for chunk in session.iter_content(chunk_size=1024):
+          f.write(chunk)
+          pbar.update(len(chunk))
+        #f.write(session.content)
+      shutil.unpack_archive("./download/mmdagent.zip","./temp/")
+      shutil.copytree("./temp/MMDAgent_Example-1.8/Voice/","./hts_voice/")
+      shutil.rmtree("./temp/MMDAgent_Example-1.8")
 
 #話者の取得
 def get_speakers():
+  if os.path.exists(config.OPENJTALK_PATH):
+    global jt_list
+    jt_list = os.listdir(config.HTS_DIR)
+    for i in jt_list:
+      speakers[i] = {}
+      for s in os.listdir(config.HTS_DIR+i):
+        if s.endswith(".htsvoice"):
+          s = s.replace(".htsvoice","")
+          speakers[i][s] = s
+    logger.info("OPENJTALKが読み込まれました")
+    logger.info(" ".join(jt_list))
+  else:
+    logger.warning("OPENJTALKが見つかりませんでした")
+  
+  if os.path.exists(config.SOFTALK_PATH):
+    global st_list
+    subprocess.call([config.SOFTALK_PATH+"SofTalk.exe","/X:1","/Z:softalk.xml"])
+    with open(config.SOFTALK_PATH+"softalk.xml",mode="r",encoding="shift_jis") as f:
+      xml = f.read()
+    xmlroot = ET.fromstring(text=xml)
+    for child in xmlroot:
+      #print(child.attrib["opt"],child.attrib["name"])
+      if child.attrib["name"] == "AquesTalk":
+        st_list.append(child.attrib["name"])
+        speakers[child.attrib["name"]] = {}
+        for ch in child:
+          #print(" ",ch.attrib["opt"],ch.text)
+          speakers[child.attrib["name"]]["AquesTalk_"+ch.text] = ch.attrib["opt"]
+    logger.info("SOFTALKが読み込まれました")
+    logger.info(" ".join(st_list))
+  else:
+    logger.warning("SOFTALKが見つかりませんでした")
+
   with requests.Session() as session:
     try:
       resp = session.get(config.VOICEVOX_SERVER+"speakers")
@@ -127,6 +200,7 @@ async def send_audio():
       
 
 
+
 #起動時の処理
 @client.event
 async def on_ready():
@@ -135,6 +209,7 @@ async def on_ready():
     logger.warning("話者が見つかりませんでした。VOICEVOXまたはVOICEROIDの設定は適切ですか？")
   logger.info("BOTが起動しました!")
   logger.info(f"{client.user.name} v{version}")
+  logger.info(speakers)
 
 def dict_reader(path):
   with open(path,mode="r",encoding="utf-16",newline="") as f:
@@ -201,9 +276,13 @@ def generate(datime,message:discord.Message,speak_conf:dict):
   logger.info(f"{message.author.display_name}: {message.content} >> {name}: {text}")
   path = f"./temp/{datime}.wav"
   if speak_conf["speaker"] in vv_list:
-    vv.generate(f"{name} {text}",path+"_temp",speak_conf["style"],speak_conf["speed"],speak_conf["pitch"])
+    vv.generate(f"{name} {text}", path+"_temp", speak_conf["style"], speak_conf["speed"], speak_conf["pitch"])
   if speak_conf["speaker"] in vc_list:
-    vc.generate(f"{name} {text}",path+"_temp",speak_conf["speaker"],speak_conf["style"],speak_conf["speed"],speak_conf["pitch"])
+    vc.generate(f"{name} {text}", path+"_temp", speak_conf["speaker"], speak_conf["style"], speak_conf["speed"], speak_conf["pitch"])
+  if speak_conf["speaker"] in jt_list:
+    jt.generate(f"{name} {text}", path+"_temp", speak_conf["speaker"], speak_conf["style"], speak_conf["speed"], speak_conf["pitch"])
+  if speak_conf["speaker"] in st_list:
+    st.generate(f"{name} {text}", path+"_temp", speak_conf["speaker"], speak_conf["style"], speak_conf["speed"], speak_conf["pitch"])
   os.rename(path+"_temp",path)
   
 
@@ -344,7 +423,7 @@ class talk(app_commands.Group):
     itr: discord.Interaction,
     current: str,
   ) -> List[app_commands.Choice[str]]:
-    return [app_commands.Choice(name=a, value=a) for a in vv_list+vc_list]
+    return [app_commands.Choice(name=a, value=a) for a in vv_list+vc_list+jt_list+st_list]
 
   async def style_autocomplete(self,
     itr: discord.Interaction,
@@ -352,20 +431,28 @@ class talk(app_commands.Group):
   ) -> List[app_commands.Choice[str]]:
     return [app_commands.Choice(name=a, value=a) for a in style_list]
     
-  v_suggest = "/talk set ずんだもん VOICEVOX_ノーマル"
+  v_suggest = "/talk set ずんだもん ずんだもん_ノーマル"
   @app_commands.command(name="set",description=help_msg[4])
   @app_commands.describe(話者=v_suggest,スタイル=v_suggest,速度=v_suggest,ピッチ=v_suggest)
   @app_commands.autocomplete(話者=actor_autocomplete,スタイル=style_autocomplete)
-  async def setvoice(self, itr:discord.Interaction, 話者:str, スタイル:str, 速度:float = 1.0, ピッチ:float = 100.0):
+  async def setvoice(self, itr:discord.Interaction, 話者:str, スタイル:str = "default", 速度:float = 1.0, ピッチ:float = 100.0):
     speaker = 話者
     style = スタイル
     speed = 速度
     pitch = ピッチ
 
-    if speaker in vv_list:
-      pitch = 0.0
-    if speaker in vc_list:
-      pitch = 1.0
+    if pitch == 100.0:
+      if speaker in vv_list:
+        pitch = 0.0
+      if speaker in vc_list:
+        pitch = 1.0
+      if speaker in jt_list:
+        pitch = 1.0
+      if speaker in st_list:
+        pitch = 1.0
+    
+    if style == "default":
+      style = next(iter(speakers[speaker].keys()))
 
     async with aiofiles.open("./user.json",mode="r",encoding="utf-8") as f:
       data = await f.read()
