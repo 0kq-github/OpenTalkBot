@@ -64,7 +64,9 @@ dict_url = "https://altushost-swe.dl.sourceforge.net/project/open-jtalk/Dictiona
 mmdagent_url = "http://jaist.dl.sourceforge.net/project/mmdagent/MMDAgent_Example/MMDAgent_Example-1.8/MMDAgent_Example-1.8.zip"
 
 global speakers
+global read_ch
 speakers:dict = {}
+read_ch:int = 0
 queue:list =[]
 vv_list = [] #voicevox話者一覧
 vc_list = [] #voiceroid話者一覧
@@ -209,7 +211,7 @@ async def on_ready():
     logger.warning("話者が見つかりませんでした。VOICEVOXまたはVOICEROIDの設定は適切ですか？")
   logger.info("BOTが起動しました!")
   logger.info(f"{client.user.name} v{version}")
-  logger.info(speakers)
+  #logger.debug(speakers)
 
 def dict_reader(path):
   with open(path,mode="r",encoding="utf-16",newline="") as f:
@@ -318,6 +320,8 @@ async def trigger(message:discord.Message):
 async def on_message(message: discord.Message):
   if message.author.bot:
     return
+  if not message.channel.id == read_ch:
+    return
   if client.voice_clients:
     await trigger(message)
 
@@ -354,6 +358,7 @@ class talk(app_commands.Group):
         description=f"<#{itr.channel.id}>\n\n:arrow_down:\n\n<#{itr.user.voice.channel.id}>",
         color=discord.Colour.green()
         )
+      read_ch = itr.channel_id
     except Exception as e:
       embed = discord.Embed(
         title="接続に失敗しました",
@@ -362,6 +367,7 @@ class talk(app_commands.Group):
         )
     finally:
       await itr.response.send_message(embed=embed)
+      os.makedirs("./temp/",exist_ok=True)
   
   @app_commands.command(name="end",description=help_msg[1])
   async def end(self, itr:discord.Interaction):
@@ -380,6 +386,7 @@ class talk(app_commands.Group):
         )
     finally:
       await itr.response.send_message(embed=embed)
+      shutil.rmtree("./temp/")
 
 
   @app_commands.command(name="add",description=help_msg[2])
