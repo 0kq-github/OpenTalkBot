@@ -17,3 +17,5 @@ SofTalkの場合はsoftalkフォルダをbotのフォルダに配置してくだ
 5. config.pyをテキストエディタで開きTokenを所定の位置に貼り付ける
 6. 4で作ったApplicationのOauth2のURL Generatorで`bot`と`applications.commands`にチェックを入れ、下に出てきたBOT PERMISSIONSで`Administrator`にチェックを入れて一番下のURLからBOTをサーバーに追加
 7. ```py main.py``` でBotを起動する
+
+[ffmpeg](https://ffmpeg.org/)
