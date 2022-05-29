@@ -2,7 +2,7 @@
 ### シンプルな読み上げBOT  
 単体鯖用  
 複数鯖はサポートしていません  
-VOICEVOXとVOICEROID2に対応    
+VOICEVOX VOICEROID2 OpenJtalk SofTalkに対応    
 
 
 # セットアップ
