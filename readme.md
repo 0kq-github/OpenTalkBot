@@ -3,6 +3,7 @@
 単体鯖用  
 複数鯖はサポートしていません  
 VOICEVOX VOICEROID2 OpenJtalk SofTalkに対応    
+読み上げBOT [0kqBee](https://net0kq.fanbox.cc/posts/3803483)もよろしくお願いします
 
 
 # セットアップ
