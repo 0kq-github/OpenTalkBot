@@ -64,7 +64,6 @@ dict_url = "https://altushost-swe.dl.sourceforge.net/project/open-jtalk/Dictiona
 mmdagent_url = "http://jaist.dl.sourceforge.net/project/mmdagent/MMDAgent_Example/MMDAgent_Example-1.8/MMDAgent_Example-1.8.zip"
 
 global speakers
-global read_ch
 speakers:dict = {}
 read_ch:int = 0
 queue:list =[]
@@ -318,6 +317,7 @@ async def trigger(message:discord.Message):
 #メッセージ受信時の処理
 @client.event
 async def on_message(message: discord.Message):
+  global read_ch
   if message.author.bot:
     return
   if not message.channel.id == read_ch:
@@ -351,6 +351,7 @@ class talk(app_commands.Group):
 
   @app_commands.command(name="start",description=help_msg[0])
   async def start(self, itr:discord.Interaction):
+    global read_ch
     try: 
       await itr.user.voice.channel.connect()
       embed = discord.Embed(

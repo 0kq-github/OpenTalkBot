@@ -1,7 +1,7 @@
 #設定ファイル
 
 #BOTのトークン
-BOT_TOKEN = ""
+BOT_TOKEN = "OTc5NTM3NTE3MzE1NTE4NDc0.GLawdX.J48iFH2JqEJAHFT_MHO4KVhFsujd37d35VoaWQ"
 
 #VOICEVOX生成サーバー
 VOICEVOX_SERVER = "http://localhost:50021/"
