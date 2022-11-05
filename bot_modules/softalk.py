@@ -5,7 +5,8 @@ import subprocess
 class softalk:
   def __init__(self,path):
     self.path = path
-    os.makedirs(path+"temp",exist_ok=True)    
+    if os.path.exists(path):
+      os.makedirs(path+"temp",exist_ok=True)    
 
   def generate(self, text:str, path:str, voice, style, speed, pitch):
     speed = f"/S:{speed*100}"

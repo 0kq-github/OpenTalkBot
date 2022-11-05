@@ -208,7 +208,7 @@ async def send_audio():
 async def on_ready():
   await tree.sync()
   if not speakers:
-    logger.warning("話者が見つかりませんでした。VOICEVOXまたはVOICEROIDの設定は適切ですか？")
+    logger.warning("話者が見つかりませんでした。音声エンジンの設定は適切ですか？")
   logger.info("BOTが起動しました!")
   logger.info(f"{client.user.name} v{version}")
   #logger.debug(speakers)
